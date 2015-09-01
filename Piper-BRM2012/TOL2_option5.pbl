@@ -1,0 +1,838 @@
+
+#################################################
+##
+##   PEBL's Tower of London Test
+##
+##   Version 0.3
+##   Released Feb 2010
+##
+##
+##
+## see
+## Shallice T. (1982), Philosophical Transactions of the Royal Society of
+## London, B, 298, 199-209.
+##
+##
+##  Problem sets available from:
+##  Fimbel, E., Lauzon, S., & Rainville, C. (2009). Performance of
+## Humans vs. Exploration Algorithms on the Tower of London Test.
+## (J. Bongard, Ed.)PLoS ONE, 4(9),
+## e7263. doi:10.1371/journal.pone.0007263
+
+##  Phillips, L. H., Wynn, V., Gilhooly, K. J., Della Sala, S., &
+##    Logie, R. H. (1999). The role of memory in the Tower of London
+##    task. Memory, 7(2), 209-231.
+#
+#
+##
+
+define Start(p)
+{
+
+  gShowHand     <- 1  #Show the hand graphic?
+  Init()
+
+
+   ##  Comment out the following lines and replace with something like 
+   ##  type <- "3"
+   ##  to go directly to a test configuration.
+   ## From here VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
+  select <- "Type number of test to use:"+ CR(2) +
+     "[1] Unconstrained pile heights, {3,4,5} disks, progressive difficulty, 30 trials"+CR(2)+
+     "[2] Unconstrained pile heights, {3,4,5} disks, Random presentation, 30 trials"+CR(2)+
+     "[3] Shallice test ([1,2,3] pile heights, 3 disks, Shallice's 12 problems."+CR(2)+
+     "[4] Shallice pile heights [1,2,3], 3 disks, 30  random trials."+CR(2)+
+     "[5] Phillips (1999) trials A (unconstrained piles, 5 disks, progressive difficulty, 8 trials)"+CR(2)+
+     "[6] Phillips (1999) trials B (unconstrained piles, 5 disks, progressive difficulty, 8 trials)"+CR(2)+
+     "[7] Phillips (1999) trials C (unconstrained piles, 5 disks, progressive difficulty, 8 trials)"+CR(2)+
+     "[8] Fimbel et al (2009) old: [1,2,3] pile heights, 3 disks, progressive difficulty, 15 trials)"+CR(2)+
+     "[9] Fimbel et al (2009) young: [1,2,3] pile heights, 3 disks, progressive difficulty, 35 trials)"+CR(3)+
+     "Edit TOL.pbl directly to specify a test configuration automatically."
+
+  gInstructions <- MakeTextBox(select,gFont,760,560)
+
+  AddObject(gInstructions,gWin)
+  Move(gInstructions,20,20)
+  Draw()
+  type <- WaitForListKeyPress(["1","2","3","4","5","6","7","8","9"])
+
+   ## to here ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  
+
+
+   ##Choose which set of trials to generate based on 'type'.
+     
+  if(type == "1")
+   {
+     stim <- ProgressiveDisks([3,4,5],8)  ## unconstrained pole height,
+                                         ## with number of disks in
+										 ## order specified by first argument
+   }elseif(type=="2")
+   {
+    stim <- RandomDisks([3,4,5],8)       ## unconstrained pole height,
+                                         ## like above but in random order
+
+   }elseif(type=="3")
+   {
+      stim <- Shallice()
+   }elseif(type=="4")
+   { 
+
+
+    stim <- ShalliceRandom(30)           ##Basic Shallice problem with
+		 								 ##	3 disks on 
+		 								 ## different-sized poles, and
+										 ##random problems
+    
+   }elseif(type=="5")
+   { 
+    stim <- Phillips1999("A")
+   }elseif(type=="6")
+   {
+
+    stim <- Phillips1999("B")
+
+   }elseif(type=="7")
+   {
+
+    stim <- Phillips1999("C")            ##5-disk problems,
+		 								 ## unconstrained pole heights
+                                         ## Argument specifies sets "A", "B", or "C"
+										 ## which consist of different problems
+   }elseif(type=="8")
+   {
+    stim <- FimbelOld()                  ##15 Shallice-like problems
+   }elseif(type=="9")
+   {
+
+    stim <- FimbelYoung()                ##35 Shallice-like problems
+      
+  }
+
+
+  
+  gInstructions.text <-"You are about to perform a task called the 'Tower of London'.  Your goal is to move a pile of disks from their original configuration to the configuration shown on the top of the screen.  You can only move one disk at a time.  To move a disk, click on the pile you want to move a disk off of, and it will move up into the hand.  Then, click on another pile, and the disk will move down to that pile.  Click the mouse to begin."
+  gInstructions.font <- gFont2
+  Draw()
+
+  WaitForDownClick()
+  Hide(gInstructions)
+  Draw()
+ 
+  InitPoles()   
+   
+
+  FilePrint(gFileOut,"sub trial size current end step abstime trialtime clicktime done")
+  FilePrint(gFileOutSum,"sub trial size start end steps time")
+
+  gInstructions.width <- 220
+  gInstructions.height <- 500
+  Move(gInstructions,555,50)
+  gInstructions.text <- "Trial Complete. "+CR(2)+ "Click mouse to continue to the next trial."
+
+
+  trial  <- 1
+
+  loop(pair, stim)
+  {
+
+
+    config <- First(pair)
+    config1 <- Second(pair)
+
+    numdisks <- Length(Flatten(config))
+
+    origstring <- MakeStateString(config)
+
+    ## Make standard and new configurations
+    c1 <- PlotDisksAnimate(config,0,450,gDisks,10)
+    c2 <- PlotDisksAnimate(config1,0,130,gDisks2,10)
+    Draw()
+    WritePNG("tol-screen.png",gWin)
+    startTime <- GetTime()
+    lasttime <- GetTime()
+    time <- GetTime()
+    FilePrint(gfileout, gSubNum + " " + trial + " " + numdisks + " " +
+                  MakeStateString(config) + " " +
+                  MakeStateString(config1) + " 0 " + starttime + " 0 "+
+                  (time - lasttime)  + " 0")
+    #Allow disk moves until the two have identical configurations.
+    continue <- 1
+    step <- 1 
+
+    while(continue)
+    {
+
+      config <- MoveDisk(config)
+      time <- GetTime()
+      FilePrint_(gfileout, gSubNum + " " + trial + " " + numdisks + " " +
+              MakeStateString(config) + " " + MakeStateString(config1) + " " + 
+                 step + " " + time +
+                  " " + (time - starttime) +" " + (time-lasttime))
+
+      lasttime <- time
+      if(StackEqual(config,config1))
+       {
+         continue <- 0
+         FilePrint(gfileout, " 1")
+       } else {
+         FilePrint(gfileout, " 0")
+       }
+    step <- step + 1 
+   }
+ 
+
+   FilePrint(gFileOutSum, gSubNum + " " + trial + " " + numdisks + " "+
+              origstring  + " " +  MakeStateString(config1) + " " + (step-1) + " " + (time-starttime))
+
+   RemoveObject(gInstructions,gWin)
+   AddObject(gInstructions,gWin)
+   Show(gInstructions)
+   Draw()
+   WaitForDownClick()
+   Hide(gInstructions)
+   HideAll()
+   trial <- trial + 1
+  }
+
+   gInstructions.text <- "Thank you for participating. The experiment is now complete.  Press any key to exit."
+
+   Show(gInstructions)
+   Draw()
+   WaitForAnyKeyPress()
+}
+
+define HideAll()
+{
+   loop(i, Merge(gDisks,gDisks2))
+   {
+     Hide(i)
+   }
+}
+
+define Init()
+{
+  gSleepEasy <- 1
+
+  gVideoWidth <- 800
+  gVideoHeight <- 600
+#  ShowCursor(0)
+  gWin <- MakeWindow("black")
+ 
+  gSubNum <- GetSubNum(gWin)
+  gFont <- MakeFont("Vera.ttf",0,16,MakeColor("white"),MakeColor("black"),1)
+  gFont2 <- MakeFont("Vera.ttf",0,26,MakeColor("white"),MakeColor("black"),1)
+}
+
+define InitPoles()
+{
+##Make hot zones for each stack.
+
+   height <- First(gPoleHeights)*30+15
+   y <- 470-height/2
+   r1 <-  Rectangle(220,y,110,height,MakeColor("grey20"),1)
+   height <-Second(gPoleHeights)*30+15
+   y <- 470-height/2
+   r2 <-  Rectangle(340,y,110,height,MakeColor("grey20"),1)
+   height <- Third(gPoleHeights)*30+15
+   y <- 470-height/2
+   r3 <-  Rectangle(460,y,110,height,MakeColor("grey20"),1)
+
+   AddObject(r1,gWin)
+   AddObject(r2,gWin)
+   AddObject(r3,gWin)
+  gZones <- [r1,r2,r3]
+
+
+  gDisks <-  [MakeImage("png/disk1.png"),MakeImage("png/disk2.png"),
+              MakeImage("png/disk3.png"),MakeImage("png/disk4.png"),
+              MakeImage("png/disk5.png"),MakeImage("png/disk6.png")]
+  gDisks2 <-  [MakeImage("png/disk1.png"),MakeImage("png/disk2.png"),
+              MakeImage("png/disk3.png"),MakeImage("png/disk4.png"),
+              MakeImage("png/disk5.png"),MakeImage("png/disk6.png")]
+
+   if(gShowHand)
+    {
+     hand   <- MakeImage("png/hand.png")
+     AddObject(hand,gWin)
+     Move(hand,330,225)
+    }
+   rect <- Rectangle(330,80,380,140,MakeColor("grey20"),1)
+   AddObject(rect,gWin)
+
+
+   footerfont <-   MakeFont("Vera.ttf",0,22,MakeColor("grey"),MakeColor("black"),1)
+
+   gFooter <- MakeLabel("Click on pile to pick up and drop disk",footerfont)
+   AddObject(gFooter,gWin)
+   Move(gFooter,300,490)
+
+   gHeader <- MakeTextBox("Target
+Stacks:",footerfont,100,70)
+   AddObject(gHeader,gWin)
+   Move(gHeader,30,50)
+  ##Keep track of the image complex:
+  gComplex <- []
+
+  gFileOut <- FileOpenAppend("tol-"+gsubnum+".txt")
+  gFileOutSum <- FileOpenAppend("tol-summary-"+gsubnum+".txt")
+
+ }
+
+
+define PlotDisks(config,inhand,ybase,disks)
+{
+  x <- 100
+  complex <- []
+  
+  loop(column,config)
+  {
+    y <- ybase
+    x <- x + 120
+    loop(i,column)
+    {
+     disk <- Nth(disks,i)
+     AddObject(disk,gWin)
+     Move(disk,x, y) 
+     Show(disk)
+     y <- y - 25 
+     complex <- Append(complex,disk)
+    }
+  }
+ if(inhand >0)
+  {
+     Move(Nth(disks,inhand),320,250)
+     AddObject(Nth(disks,inhand),gWin)
+  }
+ return  complex
+}
+
+
+
+
+define PlotDisksAnimate(config,inhand,ybase,disks,steps)
+{
+
+  if(inhand > 0)
+   {
+    diskIDs <- Flatten(Append(config,inhand))
+   }else{
+    diskIDs <- Flatten(config)
+   } 
+
+
+
+  disks2 <- SubSet(disks,Sort(diskIDs))  #Get the disks objects, in order
+
+  
+
+  startxy <- []
+  loop(i, disks2)
+   {
+     startxy <- Append(startxy, [i.x,i.y])
+   }
+
+  x <- 100
+  complex <- []
+  
+
+  ##Go through each column of the config string
+  endxy <- []
+  i <- 1
+  loop(column,config)
+  {
+    y <- ybase
+    x <- x + 120
+    loop(i,column)
+    {
+     disk <- Nth(disks,i)
+     AddObject(disk,gWin)
+     Show(disk)
+
+     pos <- [x,y]
+     endxy <- Append(endxy,pos)
+     y <- y - 25 
+     complex <- Append(complex,disk)
+    }
+
+    i <- i + 1
+  }
+   if(inhand > 0 )
+     {
+       endXY <- Append(endXY, [320,225])
+       disk <- Nth(disks,inhand)
+       AddObject(disk,gWin)
+       Show(disk)
+     }
+  endXY <- SortBy(endXY,diskIDs)
+  startend <- Transpose([startxy, endxy])
+  stepxy <- []
+
+  loop(i, startend)
+   {
+      start <- First(i)
+      end <- Second(i)
+      stepxy <- Append(stepxy,[(First(end)-First(start))/steps,
+                               (Second(end)-Second(start))/steps])
+   }
+
+  diskstep <- Transpose([disks2,endxy,stepxy])
+  step <- 1
+  while(step <= steps)
+  {
+    loop(i, diskstep)
+     {
+        disk <- First(i)
+        end <- Second(i)
+        diff <- Third(i)
+
+        disk.x <- First(end) - First(diff)   * (steps-step)
+        disk.y <- Second(end) - Second(diff) * (steps-step)
+    }
+
+   Draw()          
+   step <- step + 1
+  }
+
+ return  complex
+}
+
+
+define MoveDisk(config)
+{
+
+    first <- WaitForClickOnTarget(gZones, [1,2,3])
+
+    x <- RemoveDisk(first,config)
+ 
+    config <- First(x)
+    disk <- Nth(x,2)
+
+    if(disk != 0)
+    {
+      ##Remove the disk complex so it can be re-drawn
+      RemoveComplex(gComplex)
+	  gComplex <- PlotDisksAnimate(config,disk,450,gDisks,10)
+      Draw()
+
+
+      cont <- 1
+      while(cont)
+      {
+       #Now, get the target pile 1-3
+   	   next <- WaitForClickOnTarget(gZones, [1,2,3])
+
+       if(Length(Nth(config ,next))<Nth(gPoleHeights,next))
+          {
+            cont <- 0
+          }
+
+      }
+
+
+      RemoveComplex(gComplex)
+      config <- AddDisk(config,next,disk)
+      gComplex <- PlotDisksAnimate(config,0,450,gDisks,5)
+      Draw()
+    }
+   return config
+}
+
+define RemoveComplex(x)
+{ 
+    loop(i,x)
+    {
+       RemoveObject(i,gWin)
+    }
+}
+
+##Returns a string describing a state of the problem
+define MakeStateString(config)
+{
+
+
+
+  string <- "|"
+  loop(i,config)
+  {
+    loop(j,i)
+    {
+      string <- string + j
+    }
+    string <- string + "|"
+  }  
+
+  return string
+}
+
+##This works just on the data structure, not on the display.
+define RemoveDisk(col,ind)
+{
+##Removing:
+
+   removed <- 0
+   a <- 1
+   newcomp <- []
+   loop(i,ind)
+   {
+
+    if(a == col)
+    {
+      l <- Length(i)
+      ## Remove the last element of the list, if it exists
+      if(l == 0)
+      { 
+        newcomp <- Append(newcomp,[])
+      } elseif(l==1){
+
+        newcomp <- Append(newcomp,[])
+        removed <- First(i)
+
+      }else {
+
+        ##
+        newcomp <- Append(newcomp, SubList(i,1,l-1))
+        removed <- Nth(i,l)
+
+      }
+
+    } else {
+     newcomp <- Append(newcomp,i)
+    }
+
+	a <- a +1
+   }
+
+  return [newcomp,removed]
+}
+
+
+define AddDisk(config,nextcol,disk)
+{
+
+   a <- 1
+   newcomp <- []
+   loop(i,config)
+   {
+    if(a == nextcol)
+    {
+      newcomp <- Append(newcomp, Append(i,disk))
+
+    } else {
+     newcomp <- Append(newcomp,i)
+    }
+
+	a <- a +1
+   }
+
+  return newcomp
+}
+
+##Makes a disk configuration, with the restriction that an individual
+##stack must be shorter than its relevant pole height.
+define ShuffleDisks(num)
+{
+  order <- Shuffle(Sequence(1,num,1))
+  config <- [[],[],[]]
+
+  loop(i,order)
+   {
+      cont <- 1
+      while(cont)
+      {
+        stack <- RandomDiscrete(3)  #is there room in the stack?
+        if(Length(Nth(config,stack)) < Nth(gPoleHeights,stack))
+        {
+         cont <- 0
+        }
+      }
+
+      config <- AddDisk(config,stack,i)
+   }
+
+
+   return config
+}
+
+
+define StackEqual(stack1,stack2)
+{
+  equal <- 1
+
+  loop(x,  Transpose([stack1,stack2]))
+  {
+     a <-  First(x)
+     b <-  Nth(x,2)
+
+    if(Length(a) == Length(b) )
+       {
+            loop(j,Transpose([a,b]))
+            {
+                if(First(j) != Nth(j,2))
+                 {
+                     equal <- 0
+                 }
+            }
+ 
+       } else {
+         equal <- 0
+       }
+  }
+ return equal
+}
+
+
+define Phillips1999(set)
+{
+
+   gPoleHeights <- [5,5,5]
+
+    trialsA <-  [[[[],[4,3,2,1],[5]],   [[2,3],[4],[5,1]]],
+	             [[[5,3,2,4,1],[],[]],  [[],[1,4,3],[2,5]]],
+	             [[[4],[3,2],[5,1]],    [[2,4,3,1],[],[5]]],
+	             [[[3],[1,2,5],[4]],    [[],[4,3],[2,5,1]]],#orig. wierd
+            	 [[[],[3,5],[1,4,2]],   [[3,5],[2],[1,4]]], #original wierd
+                 [[[4,3],[5],[2,1]],    [[3,5],[2],[1,4]]],
+				 [[[2],[5,3],[1,4]],    [[],[],[5,1,4,2,3]]],
+				 [[[1,2,5,3,4],[],[]],  [[2,3],[],[5,4,1]]]]  #orig  goal wierd
+	            
+
+    trialsB <-  [ [[[4],[2,1,5],[3]],    [[4,5,1,3],[2],[]]],
+                  [[[],[2,3,4,5],[1]],    [[5,1,4],[],[3,2]]],
+                  [[[],[2],[4,3,1,5]],    [[2,1,5,3],[],[4]]],
+                  [[[],[1,3],[4,5,2]],    [[3,4,2],[1,5],[]]], #orig goal wierd
+                  [[[5,1],[],[3,4,2]],    [[2,3,4,5],[1],[]]],
+                  [[[],[],[2,1,5,3,4]],   [[1],[],[5,3,4,2]]],
+                  [[[],[3,2,4,1,5],[]],   [[5],[1,2,3],[4]]],
+                  [[[],[2,5,3,4,1],[]],   [[3,2],[1],[5,4]]] ]
+
+    trialsC <-  [ [[[4,3],[],[2,1,5]],    [[4],[5,1,3],[2]]],
+                  [[[4,1],[5,3,2],[]],    [[2,1,4,5],[],[3]]],  #original wierd
+                  [[[1,3],[4,5,2],[]],    [[],[4,3,1,5],[2]]],
+                  [[[2],[],[5,4,3,1]],    [[],[2,1],[5,3,4]]],  #orig goal wierd
+                  [[[4,2,1],[3,5],[]],    [[],[1],[5,2,3,4]]],
+                  [[[5],[1,4,3],[2]],     [[],[2,5,3],[1,4]]],
+                  [[[4,1,2,5],[],[3]],    [[3,1,4],[],[5,2]]],
+                  [[[],[],[5,1,3,2,4]],    [[],[],[2,4,1,5,3]]]]
+
+  if(set == "A")
+  {
+   ret <- trialsA
+  } elseif(set=="B")
+  {
+  ret <- trialsB
+  }  else {
+  ret <- trialsC
+  }
+ return ret
+}
+
+
+define Shallice()
+{
+   gPoleHeights <- [3,2,1]
+
+s <- [
+[  [[2,1],[3],[]],[[],[3,2],[1]]],
+[ [[2,1],[3],[]],[[2],[1],[3]]],
+[ [[2,1],[3],[]],[[2,3],[1],[]]],
+[ [[2,1],[3],[]],[[2],[1,3],[]]],
+[ [[2,1],[3],[]],[[1,2],[3],[]]],
+[ [[2,1],[3],[]],[[3],[1,2],[]]],
+[ [[2,1],[3],[]],[[1,3],[],[2]]],
+[ [[2,1],[3],[]],[[],[1,3],[2]]],
+[ [[2,1],[3],[]],[[1,2,3],[],[]]],
+[ [[2,1],[3],[]],[[1,3,2],[],[]]],
+[ [[2,1],[3],[]],[[3,2],[1],[]]],
+[ [[2,1],[3],[]],[[3],[1],[2]]  ] ]
+
+  return s
+}
+
+define FimbelOld()
+{
+
+  gPoleHeights <- [1,2,3]
+ 
+  ## 1=RED, 2=YELL, 3=BLUE
+  ##
+  ##
+
+
+  ##THIS IS ALL THE STATES
+  s <-[[[[],[],[1,2,3]],[[3],[],[1,2]],[[],[3],[1,2]],[[],[3,2],[1]],[[2],[3],[1]],[[2],[3,1],[]]],
+            [[[],[],[1,3,2]],[[2],[],[1,3]],[[],[2],[1,3]],[[],[2,3],[1]],[[3],[2],[1]],[[3],[2,1],[]]],
+            [[[],[],[3,1,2]],[[2],[],[3,1]],[[],[2],[3,1]],[[],[2,1],[3]],[[1],[2],[3]],[[1],[2,3],[]]],
+            [[[],[],[3,2,1]],[[1],[],[3,2]],[[],[1],[3,2]],[[],[1,2],[3]],[[2],[1],[3]],[[2],[1,3],[]]],
+            [[[],[],[2,3,1]],[[1],[],[2,3]],[[],[1],[2,3]],[[],[1,3],[2]],[[3],[1],[2]],[[3],[1,2],[]]],
+            [[[],[],[2,1,3]],[[3],[],[2,1]],[[],[3],[2,1]],[[],[3,1],[2]],[[1],[3],[2]],[[1],[3,2],[]]]]
+
+
+  trialsOld <- [[M(s,1,2),M(s,1,3)],
+                [M(s,5,3),M(s,5,2)],
+				[M(s,2,3),M(s,2,4)],
+				[M(s,1,2),M(s,1,5)],
+				[M(s,2,3),M(s,3,6)],
+
+				[M(s,5,3),M(s,6,5)],
+				[M(s,2,3),M(s,3,5)],
+				[M(s,5,3),M(s,6,4)],
+				[M(s,1,2),M(s,1,6)],
+				[M(s,5,3),M(s,1,6)],
+
+				[M(s,1,2),M(s,6,4)],
+				[M(s,2,3),M(s,3,3)],
+				[M(s,1,2),M(s,6,3)],
+				[M(s,5,3),M(s,1,5)],
+				[M(s,2,3),M(s,3,2)] ]
+   return trialsOld
+}
+
+
+define FimbelYoung()
+{
+
+  gPoleHeights <- [1,2,3]
+ 
+  ## 1=RED, 2=YELL, 3=BLUE
+  ##
+  ##
+
+
+  ##THIS IS ALL THE STATES
+  s <-[[[[],[],[1,2,3]],[[3],[],[1,2]],[[],[3],[1,2]],[[],[3,2],[1]],[[2],[3],[1]],[[2],[3,1],[]]],
+            [[[],[],[1,3,2]],[[2],[],[1,3]],[[],[2],[1,3]],[[],[2,3],[1]],[[3],[2],[1]],[[3],[2,1],[]]],
+            [[[],[],[3,1,2]],[[2],[],[3,1]],[[],[2],[3,1]],[[],[2,1],[3]],[[1],[2],[3]],[[1],[2,3],[]]],
+            [[[],[],[3,2,1]],[[1],[],[3,2]],[[],[1],[3,2]],[[],[1,2],[3]],[[2],[1],[3]],[[2],[1,3],[]]],
+            [[[],[],[2,3,1]],[[1],[],[2,3]],[[],[1],[2,3]],[[],[1,3],[2]],[[3],[1],[2]],[[3],[1,2],[]]],
+            [[[],[],[2,1,3]],[[3],[],[2,1]],[[],[3],[2,1]],[[],[3,1],[2]],[[1],[3],[2]],[[1],[3,2],[]]]  ]
+
+  trialsYoung    <- [[M(s,2,3),M(s,1,2)], #1
+                [M(s,2,1),M(s,1,5)],
+				[M(s,1,4),M(s,2,2)],
+				[M(s,2,6),M(s,1,2)],
+				[M(s,5,6),M(s,4,3)],
+
+				[M(s,3,3),M(s,4,4)], #6
+				[M(s,3,4),M(s,4,3)],
+				[M(s,5,3),M(s,6,3)],
+				[M(s,6,3),M(s,5,3)],
+				[M(s,6,4),M(s,1,4)],
+
+				[M(s,4,6),M(s,3,4)], #11
+				[M(s,2,2),M(s,6,5)],
+				[M(s,3,3),M(s,2,3)],
+				[M(s,2,2),M(s,3,4)],
+				[M(s,6,5),M(s,1,1)],
+
+				[M(s,2,2),M(s,6,2)],#16
+				[M(s,3,1),M(s,2,3)],
+				[M(s,5,2),M(s,3,2)],
+				[M(s,4,4),M(s,2,6)],
+				[M(s,3,2),M(s,2,3)],
+
+				[M(s,2,1),M(s,3,1)], #21
+				[M(s,3,2),M(s,1,1)],
+				[M(s,2,3),M(s,4,5)],
+				[M(s,2,2),M(s,3,1)],
+				[M(s,4,1),M(s,1,2)],
+
+				[M(s,1,4),M(s,3,1)],#26
+				[M(s,2,5),M(s,5,3)],
+				[M(s,3,6),M(s,6,5)],
+				[M(s,4,6),M(s,1,5)],
+				[M(s,6,3),M(s,3,1)],
+
+				[M(s,2,2),M(s,4,6)],#31
+				[M(s,2,4),M(s,5,1)],
+				[M(s,2,6),M(s,6,2)],
+				[M(s,3,5),M(s,6,5)],
+				[M(s,5,6),M(s,2,1)]]
+
+   return trialsYoung
+ }
+
+
+
+define ShalliceRandom(numtrials)
+{
+
+  ##Generates a random set of trials using Shallice's original 123
+  ##stack heights
+
+
+  gPoleHeights <- [1,2,3]
+
+  trials <- []   
+  i <- 1
+  while(i <= numtrials)
+   {
+     config1 <- ShuffleDisks(3)
+     config2  <- ShuffleDisks(3)
+
+    ##Make sure the two stacks are not identical at outset:
+    while(StackEqual(config1,config2))
+    {
+      config1 <- ShuffleDisks(3)
+      config2  <- ShuffleDisks(3)
+    }
+
+    trials <- Append(trials, [config1,config2])
+    i <- i + 1
+  }
+  return trials
+}
+
+
+
+
+define ProgressiveDisks(numdisks,numtrials)
+{
+
+  ##Generates a random set of trials using Shallice's original 123
+  ##stack heights
+
+
+  gPoleHeights <- [6,6,6]
+
+  trials <- []   
+
+  loop(size,numdisks)
+   {
+   i <- 1
+   while(i <= numtrials)
+   {
+     config1 <- ShuffleDisks(size)
+     config2  <- ShuffleDisks(size)
+
+    ##Make sure the two stacks are not identical at outset:
+    while(StackEqual(config1,config2))
+    {
+      config1 <- ShuffleDisks(size)
+      config2  <- ShuffleDisks(size)
+    }
+
+    trials <- Append(trials, [config1,config2])
+    i <- i + 1
+  }
+  } 
+ return trials
+}
+
+
+define RandomDisks(numdisks,numtrials)
+{
+
+  ##Generates a random set of trials using Shallice's original 123
+  ##stack heights
+
+  tmp <- ProgressiveDisks(numdisks,numtrials)
+  return Shuffle(tmp)
+}
+
+
+
+define M(m,i,j)
+{
+  return Nth(Nth(m,i),j)
+}
+

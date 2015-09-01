@@ -1,0 +1,481 @@
+## This reads in a data set, and computes scores according
+## to unique PAR rules
+
+define Start(p)
+{
+
+gWin <- MakeWindow("black")
+gId <-GetEasyInput("Please Enter your Subject ID",gWin)
+Draw()
+
+
+  ##Step-by-step instructions:
+
+  ##1. read a bcst data file in:
+  data <- FileReadTable(gId + ".txt")
+
+  ##2. ScorePars expects a header row (with non-data)!!!!
+  x <- ScorePAR(data)
+
+  ##3. cobble the header back together:
+  header <- Merge(First(data),["ptp","unambig","ptpCorr","tent","PARPERS","PARPERSERR"])
+
+  ##4. Write out to a new file
+  WriteCSV(gId + "-rescore.csv", Merge([header],x))
+
+
+  ##Calculate summaries of the two new statistics:
+  sumPers <- Sum(Nth(Transpose(x),23))
+  sumPersErr <- Sum(Nth(Transpose(x),24))
+  Print("Perseverative responses:  " + sumPers)
+  Print("Perseverative responses:  " + sumPersErr)
+
+
+##Repeat as necessary.
+
+  data <- FileReadTable("bcst64-2036.txt")
+#  ##This expects a header row!!!!
+  x <- ScorePAR(data)
+  sumPers <- Sum(Nth(Transpose(x),23))
+  sumPersErr <- Sum(Nth(Transpose(x),24))
+  Print("Perseverative responses:  " + sumPers)
+  Print("Perseverative responses:  " + sumPersErr)
+
+  WriteCSV("bcst64-2036-rescore.csv", Merge([header],x))
+
+      
+}
+
+
+define ScorePAR(data)
+{
+
+  numbers <- Sublist(data,2,Length(data))
+
+
+
+  finalData <- []
+  tdata <- Transpose(numbers)
+  
+  runs <- Levels(Third(tdata))
+
+  unambig <- 0
+  unambigX <- 0
+  unambigXX <- 0
+
+  apparentrule <- 0
+  apparentruleX <- 0
+  apparentruleXX <- 0
+
+
+  ptp <- 0
+  ptpX <- 0
+  ptpXX <- 0
+
+
+  ptpCorr   <- 0
+  ptpCorrX  <- 0
+  ptpCorrXX <- 0
+
+  rule <- 0
+  loop(i, runs)
+  {
+
+	##this pulls out just the trials on a particular run
+
+    run <- ToNumber(i)
+	filter <- Match(Third(tdata),i)
+
+    ##Get the trials for just this run:
+	trials <- Filter(numbers,filter)
+
+
+    #First, establish what the PTP is for each trial
+
+    ptps <- []
+	unambigs <- []
+	ptpCorrs <- []
+	count <- 0
+
+    minirun <- 0
+
+	jX <- []
+	jXX <- []
+	loop(j,trials)
+    {
+	 ##shift the PTP on the first count of a new run.
+     if(run > 1 and  count == 0)
+     {
+	   ptpXX <- rule
+	   ptpX <- rule
+	   ptp <- rule
+     } 
+
+
+##     rule <- ToNumber(Nth(j,4))  ##correct rule
+	 corr <-  ToNumber(Nth(j,10))
+
+
+     ## Determine whether the PTP rule should 
+     ##
+ 
+     ##Determine whether they are operating according to 
+     ##any unambiguous rule
+
+      corrcol <-    ToNumber(Nth(j,12))
+      corrshape <-  ToNumber(Nth(j,13))
+	  corrnum   <-  ToNumber(Nth(j,14))
+
+
+
+			
+      if((corrcol+corrshape+corrnum)==1)
+           {
+		      ## The PTP is the single correct element.
+			  unambigRule <- corrcol + 2*corrshape + 3*corrnum
+           } else {
+		      unambigRule <- 0
+           }
+
+
+ 	 ##Define PTP during first run:
+	 if(run==1 and ptp == 0)
+      {
+     	if(not corr)
+         {
+           if(unambigRule>0)
+           {
+		      ## The PTP is the single correct element.
+			  ptp <- unambig
+           }
+         
+
+         }
+        ##rotate the unambiguous rule memory:      
+        unambigXX <- unambigX
+		unambigX <- unambig
+		unambig <- unambigRule
+		
+
+     } else {
+
+
+     ##Should the PTP change because of a overt rule shift?
+
+
+	    ##The PTP can change if you make three unambiguous 
+		##responses to the same rule in a row.
+		if(unambigXX>0 and unambigX >0 and unambig>0)
+          { 
+
+		    if(unambigXX ==unambigX and unambigX == unambig and  corr==0)
+             {
+
+
+			    ptp <- unambig
+				ptpX <- unambig
+				ptpXX <- unambig
+
+				##is it correct?
+				ptpCorr <- 1
+				ptpCorrX <- 1
+				ptpCorrXX <- 0
+
+
+
+             }	
+          }
+
+
+        ##rotate the unambiguous rule memory:      
+        unambigXX <- unambigX
+		unambigX <- unambig
+		unambig <- unambigRule
+		
+		
+     }
+
+
+		##Rotate the PTP
+        ptpXX <- ptpX
+		ptpX <- ptp
+
+	 ptpCorrXX <- ptpCorrX
+	 ptpCorrX <- ptpCorr
+
+     ##Is it correct for the PTP?
+
+	 ptpCorr <- Nth(j,11+ptp)
+
+
+	 if(count>1)
+	 {
+      ptps <- Append(ptps,ptpXX)
+	  unambigs <- Append(unambigs,unambigXX)
+	  ptpCorrs <- Append(ptpCorrs,ptpCorrXX)
+     }
+    count <- count + 1	
+
+	 jXX <- jX
+     jX <- j
+    }
+
+
+
+	  ptps <- Merge(ptps,[ptpX,ptp])
+	  unambigs <- Merge(unambigs,[unambigX,unambig])
+	  ptpCorrs <- Merge(ptpCorrs, [ptpCorrX,ptpCorr])
+
+
+     ###############################################################
+     ##We have established the ptps for each of the trials within
+     ##the run. Now, go through the trials and score perseverative 
+     ##responses and perseverative errors  
+
+     newtrials <- Transpose(Merge(Transpose(trials),[ptps,unambigs,ptpCorrs]))
+
+
+	 ## 
+	 ##
+	 stats <- Transpose([ptps,unambigs,ptpCorrs])
+	 corr  <- Nth(Transpose(trials),10)
+	 ##loop through and mark possibly sandwiched items as
+ 	 ## tentative
+     tentatives <- []
+	 lasttent <- 0
+	 x <- 1
+	 loop(i,stats)
+     {
+
+	   ##Is this correct according to the PTP?
+	   if(Third(i)+""=="1" and (lasttent > 0))
+	   {
+
+	     tent <- 1
+  	   } elseif(Third(i)+""=="1" and Second(i)) {
+	     tent <- 2
+       }else{
+           
+	     tent <- 0
+       }
+
+       if(tent>0)
+	   {
+	     if(Second(i)+""=="0")
+		 {
+		   tent <- 3
+		 }
+	   }
+ 
+	   tentatives <- Append(tentatives,tent)
+	   lasttent <- tent
+	   x <- x  + 1
+     }
+
+	 ##Now, tentatives is written with four tokens 0 to 3.
+	 ##0 is never a possible perseveration
+     ##1 are always a perseveration
+	 ##2 are always a perseveration (at the start of a list)
+	 ##3 might be a persevaration, if sandwiched between 1s
+	 ##Any tentatives must be followed by a 'sure thing'--a 1
+	 ##So---go through tentatives backward and rewrite 3s to 0 when they
+	 ##don't follow a 1 or 3
+	 rtent <- Reverse(Transpose([tentatives,corr]))
+	 persevs <- []
+	 perserrs <- []
+	 prev <- 0
+
+
+	 loop(pair,rtent)
+	 {
+
+	   i <- First(pair)
+
+
+	    if(i==1 or i==2)
+		{
+
+          persev <- 1
+        }elseif(i ==3 )
+		{
+         if(prev == 1)
+		 {
+
+
+		   persev <- 1
+		  } else {
+
+
+		   persev <- 0
+		  }
+         } else {
+		  persev <- 0
+		}
+
+		
+		persevs <- Append(persevs,persev)
+		perserrs <- Append(perserrs, persev and (ToNumber(Second(pair))==0))
+		prev <-  persev
+     }
+
+
+##THis won't work for long sandwiches.
+if(0)
+  {
+	 prevrow <- First(newtrials)
+     currentrow <- Second(newtrials)
+     nextrow <- Third(newtrials)
+
+	 remains <- SubList(newtrials,3,Length(newtrials))
+
+	 lastptp <- 0
+	 
+	 ##It can't be a perseveration on the first trial
+     perslist <- [0]
+     perserrorlist <- [0]
+
+
+	 loop(j,remains)
+     {
+      nextrow <- j
+
+	    ##Get the PTP:
+        ptp <- Nth(currentrow,19)
+		unambig <- Nth(currentrow,20)
+
+		if(unambig)
+          {			
+
+		   ##Judge whether the response is a persevaration		
+           pers <- ToNumber(Nth(currentrow,11+ptp))
+
+           ##see if it is a persevarative error:
+           err <- 1-ToNumber(Nth(currentrow,10))
+		   perserr <- pers and (err)
+
+		   perslist <- Append(perslist,pers)
+		   perserrorlist  <- Append(perserrorlist,perserr)
+
+         } else {
+		    ##The response is 'ambigouous'
+
+             ##There are elaborate rules here
+			 ##for judging whether the response is a
+			 ##perseveration.
+
+
+			 
+
+       	  #if sandwiched by unambiguous errors, its ok. 
+           if((Nth(prevrow,20) == Nth(nextrow,20)) and
+                (ToNumber( Nth(nextrow,20))))
+             { 
+
+
+			   matchesprev <- SubList(prevrow,12,14)
+			   matchesnext <- SubList(nextrow,12,14)
+
+
+
+			   if(First(matchesprev)==First(matchesnext) and
+			      Second(matchesprev)==Second(matchesnext) and
+				  Third(matchesprev)==Third(matchesnext))
+				  {
+
+  			      unambigPrev <- ToNumber(First(matchesprev)) +
+				                 2*ToNumber(Second(matchesprev)) +
+								 3*ToNumber(Third(matchesprev))
+
+			     ##Prev and next use the same PTP
+				 matchescurr <- Sublist(currentrow,12,14)	
+
+				  if(Nth(currentrow,11+matchescurr)+""=="1")
+                   {
+				      pers <- 1
+                   } else { 
+				      pers <- 0
+                   }
+                   err <- 1-ToNumber(Nth(currentrow,10))
+                   perserr <- pers and (err)
+
+				  } else {
+				     pers <- 0
+					 perserr <- 0
+                  }
+				  
+             } else {
+
+			   pers <- 0
+			   perserr <- 0
+             }
+
+		   perslist <- Append(perslist,pers)
+		   perserrorlist  <- Append(perserrorlist,perserr)
+
+         }
+ 		
+		##update the js
+		prevrow <- currentrow
+		currentrow <- nextrow
+
+
+
+
+   
+     }
+
+	 ##Now, at the end of it all, we have one row that is unprocessed;
+     ## called nextrow.  It cannot be sandwiched, and so is only
+     ## scoreable as a persevaration according if it is unambiguous.
+
+		unambig <- Nth(nextrow,20)
+		if(unambig)
+		{
+           ##Judge whether the response is a persevaration		
+           pers <- ToNumber(Nth(nextrow,11+ptp))
+		
+           ##see if it is a persevarative error:
+           err <- 1-ToNumber(Nth(nextrow,10))
+		   perserr <- pers and (err)
+
+		   perslist <- Append(perslist,pers)
+		   perserrorlist  <- Append(perserrorlist,perserr)
+	   } else {
+		   perslist <- Append(perslist,0)
+		   perserrorlist  <- Append(perserrorlist,0)
+
+	   }
+
+
+	   }
+
+#	   finalData <- Merge(finalData,
+#                    	   Transpose(Merge(Transpose(newtrials),
+#	                                 [perslist,perserrorlist])))
+
+	   finalData <- Merge(finalData,
+                    	   Transpose(Merge(Transpose(newtrials),
+	                                 [tentatives,Reverse(persevs),Reverse(perserrs)])))
+
+
+  }
+
+   return (finalData)
+
+}
+
+
+
+define WriteCSV(name,table)
+{
+  fileout <- FileOpenWrite(name)
+  loop(i,table)
+  {
+     loop(j,i)
+	 {
+	     FilePrint_(fileout,j+",")
+     }
+	 FilePrint(fileout,"")
+  }
+  FileClose(fileout)
+}

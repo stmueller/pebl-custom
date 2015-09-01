@@ -1,0 +1,436 @@
+#!/usr/local/bin/pebl
+###########################################################
+## Digit Span, Version 0.1
+## For use with PEBL 0.06 or later
+## http://pebl.sf.net
+## Part of  The PEBL Psychological Testing Battery
+## 2006-02 Released into Public Domain
+## by Shane T. Mueller, Ph.D. (smueller at obereed dot net)
+##
+##
+## This conducts a digit span task with visual presentation
+## and typed responses. Can be manipulated to start at a low
+## length and increase until two erroneous trials in a row or 10; 
+## To start at length ten and decrease until two correct trials; or
+## to use a staircase for X trials.
+##
+## This saves two files, a basic data file in regular format and one
+## line per trial; and a second log file which lists stimuli, responses 
+## response times, etc.
+###########################################################
+
+define Start(lPar)
+{
+
+  ## results are stored in tmpresults.dat
+  gFileOut <-FileOpenAppend("dspan-" + gSubNum +".txt")
+ 
+  ## Initialize global objects for use later. Defined at end of file
+  Initialize()
+  ShowCursor(0)
+  ## This determines whether audio accompanies the visual 
+  ## presentation.
+  gUseAudio <- 1
+
+
+  ## Version can be hard-coded here, or entered with the -v command-line
+  ## argument. 1 indicates traditional low-to-high; 2 indicates high-to-low;
+  ## 3 indicates a staircase.
+  gVersion <- 1
+  
+  ## End Early determines whether the number of trials at each length
+  ## should continue only until the criterion, or if all the 
+  ## lengths should be tested.  I.e., if 2/3 correct are needed to 
+  ## pass up to the next level, we should always do 3.  Furthermore,
+  ## if endearly is 0, we will continue until we get 0/3 (or 3/3 if 
+  ## using gVersion <-2
+
+  endearly <- 0
+
+
+  upperbound <- 10            ## The longest list length
+  lowerbound <- 3             ## The shortest list length
+  perlength  <- 3             ## The number of trials at each length
+  criterion  <- 2             ## The number that must be correct to proceed
+  staircasestart  <- 4        ## starting point for staircasestart.
+  staircasetrials <- 16       ## Number of staircase trials.
+  gISI <- 1000                ## Inter-stimulus interval in ms
+  iti <- 1500                 ## inter-trial interval.
+
+  if(gVersion == 1){ 
+      startLength <- 3
+  }elseif(gVersion == 2){
+      startLength <- 10
+  }elseif(gVersion == 3){
+      startLength <- 4
+  }
+
+
+
+  ####################################################
+  ##  Now, generate stimuli/conditions
+  ####################################################
+
+  ## gStim <- FileReadList("DigitNames.txt")
+  gStim <- FileReadList("Digits.txt")
+
+  gSounds <- []
+  loop(i,gStim)
+   {
+     x <- LoadSound("stim/"+i+".wav")
+     gSounds <- Append(gSounds,x)
+   }
+
+  gReady <- LoadSound("stim/ready.wav")
+  gBeep  <- LoadSound("stim/beep.wav")
+  gCorrect <- LoadSound("stim/correct.wav")
+  gIncorrect <- LoadSound("stim/incorrect.wav")
+
+  stim <- Transpose([gStim,gSounds])
+  ####################################################
+  ## Begin presenting and collecting data
+  ####################################################
+
+
+   ## Give instructions; wait for them to hit a key, 
+   inst <- "You are about to take part in a memory test.  You will be presented with a sequence of digits, one at a time on the screen.Each digit will occur only once during a list.  You will then be asked to type the list of digits exactly in order.  If you do not know  what digit comes next, you can skip over it by typing the 'X' key.  Once entered, you cannot go back to edit your responses. "
+
+   lthInst <- inst + " You will start with a list of three items, and will get three different lists at each length.  If you are able to recall two out of three lists completely correctly, you will move on to the next longest list length."
+   htlInst <- inst + " You will start with a list of ten digits, and will get three chances to recall at each length.  After three trials, you will move down to the next lower list length.  You will continue until you are able to recall all 
+three lists at a specific length completely correctly."
+
+   scsInst <- inst + " You will start with a list of four digits.  If you are able to recall the list completely correctly, your next list will be one longer; if you are incorrect, the next list will be one shorter.  This will continue for 16 trials."
+
+   SetText(gInstructions,lthInst)
+   Show(gInstructions)
+   Draw()  
+   WaitForAnyKeyPress()
+   Hide(gInstructions)
+   Draw()
+
+ 
+####################################################
+####################################################
+##  Start the experimental trials.
+##  
+
+
+   trialnum <- 1
+   continue <- 1
+   currcorrect <- 0
+   try <- 0
+   length <- startLength 
+   lengths <- []
+
+   while(continue)
+    {
+
+      Wait(iti)
+	  FilePrint_(gFileOut, gSubNum + " " + gVersion + " " + endearly + " " + trialnum + " " + length + " " + try + " ")
+      stimuli <- SampleN(stim,length)
+      corr <-  Trial(stimuli)
+
+
+	  #############################
+      ##Standard Memory Span 
+
+
+    if(gVersion == 1)
+      {
+       try <- try + 1
+       currcorrect <- currcorrect + corr
+
+       if(endearly)
+       {
+         if(currcorrect >=  criterion)
+          {
+
+           length <- length + 1
+           currcorrect <- 0
+           try <- 0
+         } elseif(try >= perlength ) {
+
+           ##We did not pass the threshold; we are done.
+           continue <- 0
+         } 
+
+
+      } else {
+         if(try >= perlength)
+         {
+            if(currcorrect >= criterion)
+              {
+                  length <- length + 1
+                  currcorrect <- 0
+                  try <- 0
+              } else {
+                  continue <- 0
+              }
+         }
+           
+      }
+
+     if(length > upperbound)
+       {
+           continue <- 0
+       }
+
+      } elseif(gVersion == 2) {
+	  #############################
+      ## Backward Memory Span (from longest to short)
+
+      try <- try + 1
+      currcorrect <- currcorrect + corr
+
+      if(endearly) {
+        ##In this situation, only do enough trials to pass criterion.
+        if(currcorrect >=  criterion)
+         {
+           continue <- 0
+
+         } elseif(try >= perlength ) {
+           ##We we have used all the tries, go one length lower.
+           length <- length - 1
+	       currcorrect <- 0
+           try <- 0
+         }
+      } else {
+        ##In this situation, do all the trials per length, until we get them all correct.
+         if(try >= perlength) {
+            if(currcorrect == perlength)
+            {
+               continue <- 0
+            } else {
+               length <- length -1
+               currcorrect <- 0
+               try <- 0
+            }
+         }
+
+      }
+
+	   if(length < lowerbound)
+       {
+ 	     continue <- 0
+       }
+
+ 
+      } else { 
+	  #############################
+      ## Staircase
+        if(corr)
+        {
+         length <- Min([length + 1,upperbound])
+        } else {
+         length <- Max([lowerbound,length-1])
+        }
+        if(trialnum >= staircasetrials)
+        {
+          continue <- 0
+        }
+      }
+
+      if(trialnum > 4) {
+          lengths <- Append(lengths, length)
+       }
+
+      trialnum <- trialnum + 1
+
+ 
+
+    }
+   Hide(gHeader)
+   Draw()
+   FileClose(gFileOut)
+
+
+   ##Now, show debriefing info.
+   feedback <-  "Thank you for participating in the experiment. "
+
+   if(gVersion == 1) { 
+        feedback <- feedback + "Your memory span was " + (length-1) + ". "
+   } elseif(gVersion == 2) {
+        feedback <- feedback + "Your memory span was " + (length+1) + ". "
+
+   }else{
+        feedback <- feedback + "Your memory span was " + Mean(lengths) + ". "
+   }
+   feedback <- feedback + CR(2) + "Press any key to exit."
+   
+   
+   SetText(gInstructions, feedback)
+   Show(gInstructions)
+   Draw()
+   WaitForKeyPress("X")
+   ShowCursor(1)  
+ }
+
+
+define Trial(stimpairs)
+{
+
+  stim <- First(Transpose(stimpairs))
+  length <- Length(stimpairs)
+  string <- ListToString(stimpairs)
+  dummy  <- Repeat("_",length)
+  responselist   <- []
+
+  gStimLabel.text <- "Length " + length
+  Show(gStimLabel)
+
+  Draw()
+  PlayForeground(gReady)
+  Wait(800)
+  Hide(gStimLabel)
+  Draw()
+  Show(gStimLabel)
+
+  Wait(1000)
+    
+  loop(x,stimpairs)
+  {
+    digit <- First(x)
+    sound <-Nth(x,2)
+
+    FilePrint_(gFileOut,digit)
+    gStimLabel.text <- digit
+    Draw()
+    t1 <- GetTime()
+	if(gUseAudio){PlayForeground(sound)}
+    t2 <- GetTime()
+    Wait(gISI - (t2-t1))
+  }
+  FilePrint_(gFileOut, " ")
+  ##Play a response signal.
+
+
+
+  Hide(gStimLabel)
+  gStimLabel.text <- ListToString(dummy)
+  Draw()
+  if(gUseAudio){PlayForeground(gBeep)}
+  
+  ##Now, collect the responses.
+  gHeader.text <- "Use 0-9 and '-', press enter when complete."
+
+  Show(gHeader)
+  Show(gStimLabel)
+  Draw()
+  corr <- 0
+  responses <- ["1","2","3","4","5","6","7","8","9","0","-","<backspace>","<return>"]
+  position <- 1
+  resp <- ""
+
+  while(not resp == "<return>")
+  {
+    resp <- WaitForListKeyPress(responses)
+    if(resp == "<backspace>")
+    {
+	    if(Length(responseList) == 1) 
+        {  
+           responseList <- []
+		   position <- 1
+        } else {
+           responseList <- SubList(responselist, 1, Length(responseList)-1)
+           position <- position - 1
+        }
+
+
+     } elseif(resp == "<return>") {
+         ##
+         33
+     } else {
+
+        if(position <= length) {
+          position <- position + 1
+          responseList <- Append(responseList,resp)
+          } 
+     }
+    
+    resptext <- ListToString(Merge(responseList,Repeat("_",(length - position + 1))))
+    gStimLabel.text <- resptext
+    Draw()
+  }
+
+  FilePrint_(gFileOut,resptext)
+
+  ##See if things are correct.
+  if( ListToString(stim) == resptext)
+   {
+	 corr <- 1
+   }
+
+  FilePrint(gFileOut," " + corr)
+
+  Wait(200)
+
+  ##Give Feedback Here
+  gFeedback.text <- ListToString(stim)
+  Show(gFeedback)
+  Draw()
+  Wait(1500)
+  if(corr)
+  {
+   gFeedback.text <- "Correct!"
+   feedbacksound <- gCorrect
+  } else {
+  gFeedback.text <- "Incorrect"
+   feedbacksound <- gIncorrect
+  }
+  Draw()
+  PlayForeground(feedbacksound)
+  Wait(1500)
+
+  Hide(gFeedback)
+  Hide(gStimLabel)
+  Draw()
+ return corr
+}
+
+##  This is a standard initializer function that sets up typical
+##  objects used in experiments.
+define Initialize()
+{
+  ##Initialize Window, etc.
+  gWin <- MakeWindow("grey")   
+            
+  ##Initialize Font and colors
+
+   bg <- MakeColor("grey")
+   bg1 <- MakeColor("lightgrey")
+   fg <- MakeColor("black")
+   bg2 <- MakeColor("white")
+   
+   colGreen <- MakeColor("darkgreen")
+   colRed   <- MakeColor("red")
+ 
+   gStimFont         <- MakeFont("VeraMono.ttf", 0, 56, fg,bg,1)       
+
+   gInstructionsFont <- MakeFont("Vera.ttf",0,18, fg,bg2,1)  
+   gHeaderFont       <- MakeFont("Vera.ttf", 0,24,fg,bg,1)       
+ 
+   ## Make and place the instruction box, then hide it  
+   gInstructions <- MakeTextBox("", gInstructionsFont, 600,300)
+   AddObject(gInstructions, gWin)
+   Move(gInstructions, gVideoWidth/2-300, gVideoHeight/2-150)
+   Hide(gInstructions)
+
+   ## Make and hide a header label
+   gHeader <- MakeTextBox("",gHeaderFont, 600,200)
+   AddObject(gHeader,gWin)
+   Move(gHeader, gVideoWidth/2-250, 50)
+   Hide(gHeader)
+
+
+   gStimLabel <- MakeLabel("",gStimFont)
+   AddObject(gStimLabel,gWin)
+   Move(gStimLabel, gVideoWidth/2, gVideoHeight/2)
+   Hide(gStimLabel)
+ 
+   gFeedback <- MakeLabel("",gStimFont)
+   AddObject(gFeedback,gWin)
+   Move(gFeedback, gVideoWidth/2, gVideoHeight/2+70)
+   Hide(gFeedback)
+  
+
+ }
